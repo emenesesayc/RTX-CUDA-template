@@ -15,9 +15,8 @@ The sample code simulates `n` randomly generated numbers, by shifting their valu
 - THrust (for comparison)
 
 ## Compile and run
+Change OptiX path in `Makefile`
 ```
-mkdir build && cd build
-cmake ../ -DOPTIX_HOME=<PATH-TO-OPTIX-MAIN-DIR> -DThrust_DIR=<PATH-TO-THRUST-CMAKE-CONFIG> -DCUB_DIR=<PATH-TO-CUB-CMAKE-CONFIG>
 make
 ./rtxcuda <dev> <n> <s> <alg>
 dev = device ID
@@ -28,11 +27,6 @@ alg = algorithm
    2 -> CUB
    3 -> THRUST
    4 -> RTX_CLOSEST_HIT
-```
-## Example compilation
-```
->> cmake ../ -DOPTIX_HOME=~/NVIDIA-OptiX-SDK-7.7.0-linux64-x86_64 -DThrust_DIR=/opt/cuda/targets/x86_64-linux/lib/cmake/thrust -DCUB_DIR=/opt/cuda/targets/x86_64-linux/lib/cmake/cub
->> make
 ```
 
 ## Example execution
