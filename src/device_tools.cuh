@@ -1,4 +1,18 @@
 #pragma once
+
+__host__ __device__ float distance2(Particle* a, Particle* b) {
+    float dx = b->pos.x - a->pos.x;
+    float dy = b->pos.y - a->pos.y;
+    float dz = b->pos.z - a->pos.z;
+    return dx*dx + dy*dy + dz*dz;
+}
+
+__host__ __device__ float distance(Particle* a, Particle* b) {
+    return sqrt(distance2(a, b));
+}
+
+
+// print
 #define PRINT_LIMIT 32
 __global__ void kernel_print_array_dev(int n, float *darray){
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
@@ -43,6 +57,54 @@ void print_vertices_dev(int ntris, float3 *devVertices){
     cudaDeviceSynchronize();
 }
 
+void print_int_array(const char* name, int* array, int n){
+    if(n==0) { printf("%s[%d] = ~\n", name, n); return; }
+    printf("%s[%d] = {", name, n);
+    for(int i=0; i<min(n-1, PRINT_LIMIT); i++){
+        printf("%d, ", array[i]);
+    }
+    printf("%d", array[n-1]);
+    if(n>PRINT_LIMIT) printf(", ... }\n");
+    else printf("}\n");
+}
+
+void print_particle(Particle* p){
+    printf("id: %d, pos(%.4f,%.4f,%.4f), size: %.2f\n", p->id, p->pos.x, p->pos.y, p->pos.z, p->size);
+}
+
+void print_particles_array(Particle* array, int n){
+    printf("particle array[%d] = {\n", n);
+    for(int i=0; i<min(n, PRINT_LIMIT); i++){
+        printf("\t");
+        print_particle(&array[i]);
+    }
+    if(n>PRINT_LIMIT) printf("\t...\n");
+    printf("}\n");
+}
+
+void print_log(const char* message, char* log, size_t n){
+    log[n] = '\0';
+    if(n < 2 || strlen(log) < 1) return;
+    printf(AC_CYAN "LOG[%d]: " AC_BLUE "%s" AC_BLUE ": %s" AC_RESET, n, message, log);
+    //printf("%s\n",log);
+    /*for(int i=0;i<n;i++){
+        printf("%c(%d)", log[i], (int)log[i]);
+    }
+    printf("\n");*/
+}
+
+void print_all_neighbors(int* neighbors, int* nneigh, int n){
+    char strid[16];
+    printf("List of neighbors of %d particles (NMAX=%d) :\n", n, NMAX);
+    for(int i=0; i<min(n, PRINT_LIMIT); i++){
+        sprintf(strid, "id:%d", i);
+        printf("\t");
+        print_int_array(strid, &neighbors[i*NMAX], nneigh[i]);
+    }
+    printf("\t...\n");
+}
+
+// Geometry generation
 __global__ void kernel_gen_vertices(int ntris, float *array, float3 *vertices){
     int tid = blockIdx.x*blockDim.x + threadIdx.x;
     if(tid < ntris){
@@ -89,36 +151,6 @@ uint3* gen_triangles_dev(int ntris, float *darray){
     return devTriangles;
 }
 
-float cpumin_vertex(int nv, float3 *dv){
-    float3 *hv = new float3[nv];
-    cudaMemcpy(hv, dv, sizeof(float3)*nv, cudaMemcpyDeviceToHost);
-    cudaDeviceSynchronize();
-    float min = 1000.0f;
-    for(int i=0; i<nv; ++i){
-        float val = hv[i].x;
-        if(val < min){
-            min = val;
-        }
-    }
-    return min;
-}
-
-
-float cpumin_point(int np, float *dp){
-    float *hp = new float[np];
-    cudaMemcpy(hp, dp, sizeof(float)*np, cudaMemcpyDeviceToHost);
-    cudaDeviceSynchronize();
-    float min = 1000000.0f;
-    for(int i=0; i<np; ++i){
-        //printf("Checking [%i] = %f\n", i, hp[i]);
-        float val = hp[i];
-        if(val < min){
-            min = val;
-            //printf("CPU new min %f\n", min);
-        }
-    }
-    return min;
-}
 
 void cpuprint_array(int np, float *dp){
     float *hp = new float[np];
@@ -127,4 +159,35 @@ void cpuprint_array(int np, float *dp){
     for(int i=0; i<np; ++i){
         printf("array [%i] = %f\n", i, hp[i]);
     }
+}
+
+
+bool compare_neighbors_result(int* neighbors_a, int* nneigh_a, int* neighbors_b, int* nneigh_b, int n)
+{
+    //comparing neighbors's numbers
+    for(int i=0; i<n; i++){
+        if(nneigh_a[i] != nneigh_b[i]) {
+            printf(AC_BOLDRED "DIFFERENT NEIGHBORS NUMBER FOR PARTICLE %d: %d != %d.\n" AC_RESET, i, nneigh_a[i], nneigh_b[i]);
+            return false;
+        }
+    }
+
+    //comparing neighbors itself
+    for(int pi=0; pi<n; pi++){
+       for(int i=0; i<NMAX; i++){
+            bool is_same = false;
+            int id_i = neighbors_a[pi*NMAX + i];
+            for(int j=0; j<NMAX; j++){
+                if(id_i == neighbors_a[pi*NMAX + j]){
+                    is_same = true;
+                }
+            }
+            if(!is_same){
+                printf(AC_BOLDRED "DIFFERENT NEIGHBORS NUMBER FOR PARTICLE %d: NEIGHBOR %d IS NOT FOUND.\n" AC_RESET, pi, id_i);
+                return false;
+            }
+        }
+    }
+    printf(AC_BOLDGREEN "COMPARISON SUCCEEDED !\n" AC_RESET);
+    return true;
 }

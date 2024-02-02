@@ -16,14 +16,13 @@
 
 #define BSIZE 1024
 #define WARPSIZE 32
-#define RTX_REPEATS 1
 #define ALG_CLASSIC         0
-#define ALG_WARP_SHUFFLE    1
-#define ALG_CUB             2
-#define ALG_THRUST          3
-#define ALG_RTX_CLOSEST_HIT 4
-const char *algStr[6] = {"", "WARP_SHUFFLE", "CUB", "THRUST", "RTX_CLOSEST_HIT"};
+#define ALG_GRID            1
+#define ALG_RTX             2
+const char *algStr[3] = {"CLASSIC", "GRID", "RTX"};
+size_t NMAX;
 
+#include "src/rtx_params.h"
 #include "common/common.h"
 #include "common/Timer.h"
 #include "src/rand.cuh"
@@ -40,39 +39,51 @@ int main(int argc, char *argv[]) {
     printf("----------------------------------\n");
     printf("  RTX-CUDA Template by Temporal   \n");
     printf("----------------------------------\n");
-    if(!check_parameters(argc)){
-        exit(EXIT_FAILURE);
-    }
 
     CmdArgs args = get_args(argc, argv);
     int dev = args.dev;
     int n = args.n;
-    //int k = atoi(argv[3]);
     int steps = args.steps;
     int alg = args.alg;
-    int seed = 1123;
+    float radius = args.r;
+    NMAX = args.nmax;
 
     cudaSetDevice(dev);
     print_gpu_specs(dev);
-    // 1) data on GPU, result has the resulting array and the states array
-    curandState* devStates = setup_curand(n, seed);
-    float* d_array = create_random_array_dev<float>(n, 100.0, devStates);
 
+
+    // 1) data on GPU, result has the resulting array and the states array
+    float3 dim_world = make_float3(100.f, 100.f, 100.f);
+    float min_psize = radius;
+    float max_psize = radius;
+    printf("Generating random particles\n");
+    curandState* devStates = setup_curand(n, args.seed);
+    Particle* d_particles = create_random_uniform_particles(n, dim_world, min_psize, max_psize, devStates);
+    Particle* h_particles = (Particle*)malloc(sizeof(Particle) * n);
+    CUDA_CHECK( cudaMemcpy(h_particles, d_particles, sizeof(Particle) * n, cudaMemcpyDeviceToHost) );
+
+    int* neighbors = new int[n * args.nmax];
+    int* nneigh = new int[n];
 
     // 2) computation
     switch(alg){
-        case ALG_WARP_SHUFFLE:
-            cudaWarpShuffle(n, steps, d_array, devStates);
+        case ALG_CLASSIC:
+            nn_cpu(h_particles, n, neighbors, nneigh, radius, args);
             break;
-        case ALG_CUB:
-            cudaCUB(n, steps, d_array, devStates);
+        case ALG_GRID:
+            //TODO
             break;
-        case ALG_THRUST:
-            cudaThrust(n, steps, d_array, devStates);
+        case ALG_RTX:
+            nn_rtx(n, steps, alg, h_particles, d_particles, devStates, neighbors, nneigh, radius, args);
             break;
-        case ALG_RTX_CLOSEST_HIT:
-            rtx(n, 1, steps, alg, d_array, devStates);
-            break;
+    }
+
+    //print_particles_array(h_particles, n);
+    print_int_array("number of neighbors", nneigh, n);
+    print_all_neighbors(neighbors, nneigh, n);
+
+    if (args.check) {
+
     }
     printf("Benchmark Finished\n");
     return 0;

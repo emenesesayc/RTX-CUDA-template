@@ -4,7 +4,7 @@
 
 
 extern "C" static __constant__ Params params;
-
+/*
 // min con closesthit
 extern "C" __global__ void __raygen__rtx1() {
     //const uint3 idx = optixGetLaunchIndex();
@@ -37,6 +37,7 @@ extern "C" __global__ void  __closesthit__rtx() {
 extern "C" __global__ void  __miss__rtx() {
     optixSetPayload_0(__float_as_uint(INFINITY));
 }
+*/
 
 
 

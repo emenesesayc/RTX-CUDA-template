@@ -7,7 +7,7 @@
 #include <iostream>
 #include <fstream>
 
-#define ARG_NB 2
+#define ARG_NMAX 2
 #define ARG_REPS 3
 #define ARG_DEV 4
 #define ARG_NT 5
@@ -17,7 +17,7 @@
 #define ARG_POWER 9
 
 struct CmdArgs {
-    int n, alg, steps, reps, dev, nt, seed, check, save_time, save_power;
+    int n, alg, r, steps, reps, nmax, dev, nt, seed, check, save_time, save_power;
     std::string time_file, power_file;
 };
 
@@ -29,17 +29,20 @@ struct Results {
 };
 
 void print_help(){
-    fprintf(stderr, AC_BOLDGREEN "run as ./rtxcuda <dev> <n> <s> <alg>\n" AC_RESET
+    fprintf(stderr, AC_BOLDGREEN "run as ./rtxcuda <n> <r> <s> <alg>\n" AC_RESET
                     "n   = problem size\n"
+                    "r   = radius\n"
                     "s   = number of simulation steps\n"
                     "alg = algorithm\n"
+                    "   0 -> %s\n"
                     "   1 -> %s\n"
                     "   2 -> %s\n"
-                    "   3 -> %s\n"
-                    "   4 -> %s\n"
-                    "   5 -> %s\n"
+                    //"   3 -> %s\n"
+                    //"   4 -> %s\n"
+                    //"   5 -> %s\n"
                     "\n"
                     "Options:\n"
+                    "   --nmax <max_num_neighbors> (default: 1024)\n"
                     "   --reps <repetitions>      RMQ repeats for the avg time (default: 10)\n"
                     "   --dev <device ID>         device ID (default: 0)\n"
                     "   --nt  <thread num>        number of CPU threads\n"
@@ -47,29 +50,34 @@ void print_help(){
                     "   --check                   check correctness\n"
                     "   --save-time=<file>        \n"
                     "   --save-power=<file>       \n",
+                    algStr[0],
                     algStr[1],
-                    algStr[2],
-                    algStr[3],
-                    algStr[4],
-                    algStr[5]);
+                    algStr[2]
+                    //algStr[3],
+                    //algStr[4]
+                );
 }
 
-#define NUM_REQUIRED_ARGS 4
+#define NUM_REQUIRED_ARGS 5
 CmdArgs get_args(int argc, char *argv[]) {
     if (argc < NUM_REQUIRED_ARGS) {
         print_help();
         exit(EXIT_FAILURE);
     }
 
+
     CmdArgs args;
     args.n = atoi(argv[1]);
-    args.steps = atoi(argv[2]);
-    args.alg = atoi(argv[3]);
+    args.r = atof(argv[2]);
+    args.steps = atoi(argv[3]);
+    args.alg = atoi(argv[4]);
     if (!args.n || !args.steps) {
         print_help();
+        printf("ASD1\n");
         exit(EXIT_FAILURE);
     }
 
+    args.nmax = 1024;
     args.reps = 10;
     args.seed = time(0);
     args.dev = 0;
@@ -82,6 +90,7 @@ CmdArgs get_args(int argc, char *argv[]) {
     
     static struct option long_option[] = {
         // {name , has_arg, flag, val}
+        {"nmax", required_argument, 0, ARG_NMAX},
         {"reps", required_argument, 0, ARG_REPS},
         {"dev", required_argument, 0, ARG_DEV},
         {"nt", required_argument, 0, ARG_NT},
@@ -95,6 +104,8 @@ CmdArgs get_args(int argc, char *argv[]) {
         if (isdigit(opt))
                 continue;
         switch (opt) {
+            case ARG_NMAX:
+                args.nmax = atoi(optarg);
             case ARG_REPS:
                 args.reps = atoi(optarg);
                 break;
