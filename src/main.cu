@@ -21,6 +21,8 @@
 #define ALG_RTX             2
 const char *algStr[3] = {"CLASSIC", "GRID", "RTX"};
 size_t NMAX;
+char LOG[2048];
+size_t LOG_SIZE = 1;
 
 #include "src/rtx_params.h"
 #include "common/common.h"
@@ -66,6 +68,8 @@ int main(int argc, char *argv[]) {
     int* nneigh = new int[n];
 
     // 2) computation
+    //TODO simlation loop
+    // method should compute only one iterarion
     switch(alg){
         case ALG_CLASSIC:
             nn_cpu(h_particles, n, neighbors, nneigh, radius, args);
@@ -77,10 +81,14 @@ int main(int argc, char *argv[]) {
             nn_rtx(n, steps, alg, h_particles, d_particles, devStates, neighbors, nneigh, radius, args);
             break;
     }
+    // TODO particle movement
+    // add check simulation inside main simulation?
 
     //print_particles_array(h_particles, n);
     print_int_array("number of neighbors", nneigh, n);
-    print_all_neighbors(neighbors, nneigh, n);
+    print_all_neighbors(neighbors, nneigh, n, h_particles);
+
+    printf("dist2(p3,p4) = %f\n", distance2(h_particles[3].pos, h_particles[4].pos));
 
     if (args.check) {
 

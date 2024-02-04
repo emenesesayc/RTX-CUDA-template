@@ -65,3 +65,58 @@ Particle* create_random_uniform_particles(int n, float3 dim_world, float smin, f
     return d_particle;
 }
 
+__global__ void kernel_brownian_border_movement_particles(Particle* d_particles, curandState* curand_states, int n, float factor, float3 dim)
+{
+    int tid = blockIdx.x*blockDim.x + threadIdx.x;
+    while(tid < n) {
+    //if(tid < n){
+        //d_particles[tid].size += 0.2f;
+        float3 npos = d_particles[tid].pos;
+        float3 mov = make_float3(   curand_uniform(&curand_states[tid]) * 2.f - 1.f,
+                                    curand_uniform(&curand_states[tid]) * 2.f - 1.f,
+                                    curand_uniform(&curand_states[tid]) * 2.f - 1.f);// * make_float3(factor);
+        npos.x += mov.x * factor;
+        npos.y += mov.y * factor;
+        npos.z += mov.z * factor;
+        if(npos.x < 0 || npos.x > dim.x) npos.x -= 2*mov.x;
+        if(npos.y < 0 || npos.y > dim.y) npos.y -= 2*mov.y;
+        if(npos.z < 0 || npos.z > dim.z) npos.z -= 2*mov.z;
+        d_particles[tid].pos = npos;
+        tid += gridDim.x*blockDim.x;
+    }
+}
+
+__global__ void kernel_brownian_modulo_movement_particles(Particle* d_particles, curandState* curand_states, int n, float factor, float3 dim)
+{
+    int tid = blockIdx.x*blockDim.x + threadIdx.x;
+    while(tid < n) {
+    //if(tid < n){
+        //d_particles[tid].size += 0.2f;
+        float3 npos = d_particles[tid].pos;
+        float3 mov = make_float3(   curand_uniform(&curand_states[tid]) * 2.f - 1.f,
+                                    curand_uniform(&curand_states[tid]) * 2.f - 1.f,
+                                    curand_uniform(&curand_states[tid]) * 2.f - 1.f);// * make_float3(factor);
+        npos.x = fmod( (npos.x + (mov.x * factor)), dim.x );
+        npos.y = fmod( (npos.y + (mov.y * factor)), dim.y );
+        npos.z = fmod( (npos.z + (mov.z * factor)), dim.z );
+        d_particles[tid].pos = npos;
+        tid += gridDim.x*blockDim.x;
+    }
+}
+
+
+void move_particles_brownian(bool modulo, Particle* d_particles, curandState* curand_states, int n, float factor, float3 dim)
+{
+    dim3 block(BSIZE, 1, 1);
+    dim3 grid((n+BSIZE-1)/BSIZE, 1, 1);
+    if(modulo) {
+        kernel_brownian_modulo_movement_particles<<<grid, block>>>(d_particles, curand_states, n, factor, dim);
+    } else {
+        kernel_brownian_border_movement_particles<<<grid, block>>>(d_particles, curand_states, n, factor, dim);
+        //kernel_brownian_movement_particles<<<1,1>>>(d_particles, curand_states, n, factor, dim);
+    }
+
+    cudaDeviceSynchronize();
+}
+
+

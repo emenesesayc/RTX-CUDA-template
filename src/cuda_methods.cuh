@@ -16,6 +16,9 @@ void cpu_nns(Particle* particles, int N, int* neighbors, int* nneigh, float radi
         Particle p = particles[i];
         for(int j=i+1; j<N; j++){
             Particle pn = particles[j];
+            if (i == 3 or i == 4) {
+                printf("ray%i  -  p%i,  d2 = %f\n", i, j, distance2(p.pos,pn.pos));
+            }
             if(distance2(&p, &pn) < radius2) {
                 neighbors[i*NMAX + nneigh[i]++] = j;
                 neighbors[j*NMAX + nneigh[j]++] = i;

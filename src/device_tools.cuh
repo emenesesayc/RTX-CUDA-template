@@ -1,14 +1,11 @@
 #pragma once
 
-__host__ __device__ float distance2(Particle* a, Particle* b) {
-    float dx = b->pos.x - a->pos.x;
-    float dy = b->pos.y - a->pos.y;
-    float dz = b->pos.z - a->pos.z;
-    return dx*dx + dy*dy + dz*dz;
-}
 
+__host__ __device__ float distance2(Particle* a, Particle* b) {
+    return distance2(a->pos, b->pos);
+}
 __host__ __device__ float distance(Particle* a, Particle* b) {
-    return sqrt(distance2(a, b));
+    return sqrt(distance2(a->pos, b->pos));
 }
 
 
@@ -93,11 +90,11 @@ void print_log(const char* message, char* log, size_t n){
     printf("\n");*/
 }
 
-void print_all_neighbors(int* neighbors, int* nneigh, int n){
+void print_all_neighbors(int* neighbors, int* nneigh, int n, Particle* p){
     char strid[16];
     printf("List of neighbors of %d particles (NMAX=%d) :\n", n, NMAX);
     for(int i=0; i<min(n, PRINT_LIMIT); i++){
-        sprintf(strid, "id:%d", i);
+        sprintf(strid, "id:%d(%.1f,%.1f,%.1f)", i, p[i].pos.x, p[i].pos.y, p[i].pos.z);
         printf("\t");
         print_int_array(strid, &neighbors[i*NMAX], nneigh[i]);
     }
@@ -190,4 +187,45 @@ bool compare_neighbors_result(int* neighbors_a, int* nneigh_a, int* neighbors_b,
     }
     printf(AC_BOLDGREEN "COMPARISON SUCCEEDED !\n" AC_RESET);
     return true;
+}
+
+__global__ void kernel_update_aabbs(Particle* d_particles, OptixAabb* d_aabb_array, int n, float radius){
+    int tid = blockIdx.x*blockDim.x + threadIdx.x;
+    while(tid < n) {
+        OptixAabb aabb = d_aabb_array[tid];
+        float3 pos = d_particles[tid].pos;
+        aabb.minX = pos.x - radius;
+        aabb.minY = pos.y - radius;
+        aabb.minZ = pos.z - radius;
+        aabb.maxX = pos.x + radius;
+        aabb.maxY = pos.y + radius;
+        aabb.maxZ = pos.z + radius;
+        d_aabb_array[tid] = aabb;
+        tid += gridDim.x*blockDim.x;
+    }
+}
+
+void update_aabb_from_particles(Particle* d_particles, OptixAabb* d_aabb_array, int n, float radius)
+{
+    dim3 block(BSIZE, 1, 1);
+    dim3 grid((n+BSIZE-1)/BSIZE, 1, 1);
+    kernel_update_aabbs<<<grid, block>>>(d_particles, d_aabb_array, n, radius);
+    CUDA_CHECK( cudaDeviceSynchronize() );
+}
+
+
+__global__ void kernel_init_nneigh(int* d_nneigh, int n){
+    int tid = blockIdx.x*blockDim.x + threadIdx.x;
+    while(tid < n) {
+        d_nneigh[tid] = 0;
+        tid += gridDim.x*blockDim.x;
+    }
+}
+
+void init_nneigh(int* d_nneigh, int n)
+{
+    dim3 block(BSIZE, 1, 1);
+    dim3 grid((n+BSIZE-1)/BSIZE, 1, 1);
+    kernel_init_nneigh<<<grid, block>>>(d_nneigh, n);
+    CUDA_CHECK( cudaDeviceSynchronize() );
 }
