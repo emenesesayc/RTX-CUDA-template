@@ -34,9 +34,6 @@ extern "C" __global__ void __intersection__radius() {
         float3 pos_obj = particles[obj_id].pos;
         float r = params.r;
         float d2 = distance2(pos_ray, pos_obj);
-        if (ray_id == 3 or ray_id == 4) {
-            printf("ray%i  -  p%i,  d2 = %f\n", ray_id, obj_id, d2);
-        }
 
         if (d2 < r*r) {
             int* neighbors = params.d_neighbors;

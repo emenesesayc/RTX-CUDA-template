@@ -49,6 +49,7 @@ int main(int argc, char *argv[]) {
     int alg = args.alg;
     float radius = args.r;
     NMAX = args.nmax;
+    int GPU = args.alg;
 
     cudaSetDevice(dev);
     print_gpu_specs(dev);
@@ -64,31 +65,75 @@ int main(int argc, char *argv[]) {
     Particle* h_particles = (Particle*)malloc(sizeof(Particle) * n);
     CUDA_CHECK( cudaMemcpy(h_particles, d_particles, sizeof(Particle) * n, cudaMemcpyDeviceToHost) );
 
-    int* neighbors = new int[n * args.nmax];
-    int* nneigh = new int[n];
+    int* h_neighbors = new int[n * args.nmax];
+    int* h_nneigh = new int[n];
+    int *d_neighbors, *d_nneigh;
+    CUDA_CHECK( cudaMalloc(&d_nneigh, sizeof(int) * n) );
+    CUDA_CHECK( cudaMalloc(&d_neighbors, sizeof(int) * n * NMAX) );
+
+    RTNN rtnn;
 
     // 2) computation
     //TODO simlation loop
     // method should compute only one iterarion
+    // setup
     switch(alg){
         case ALG_CLASSIC:
-            nn_cpu(h_particles, n, neighbors, nneigh, radius, args);
             break;
         case ALG_GRID:
             //TODO
             break;
         case ALG_RTX:
-            nn_rtx(n, steps, alg, h_particles, d_particles, devStates, neighbors, nneigh, radius, args);
+            printf("--------------------- RTX OptiX Nearest-Neighbors Searching %-5s ---------------------\n", algStr[args.alg]);
+            rtnn.n = n;
+            rtnn.d_nneigh = d_nneigh;
+            rtnn.d_neighbors = d_neighbors;
+            rtnn.d_particles = d_particles;
+            rtnn.radius = args.r;
+            rtnn.args = args;
+            rtnn.config();
+            rtnn.build_geom();
+            rtnn.set_params();
             break;
     }
-    // TODO particle movement
-    // add check simulation inside main simulation?
+
+    // simulation
+    //for (int it = 0; it < args.steps; ++it) {
+        switch(alg){
+            case ALG_CLASSIC:
+                nn_cpu(h_particles, n, h_neighbors, h_nneigh, radius, args);
+                break;
+            case ALG_GRID:
+                //TODO
+                break;
+            case ALG_RTX:
+                rtnn.nn();
+                break;
+        }
+        // TODO particle movement
+        // add check simulation inside main simulation?
+    //}
+
+    // cleanup
+    switch(alg){
+        case ALG_CLASSIC:
+            break;
+        case ALG_GRID:
+            //TODO
+            break;
+        case ALG_RTX:
+            rtnn.cleanup();
+            break;
+    }
+
+    if (GPU) {
+        CUDA_CHECK( cudaMemcpy(h_nneigh, d_nneigh, sizeof(int) * n, cudaMemcpyDeviceToHost) );
+        CUDA_CHECK( cudaMemcpy(h_neighbors, d_neighbors, sizeof(int) * n * NMAX, cudaMemcpyDeviceToHost) );
+    }
 
     //print_particles_array(h_particles, n);
-    print_int_array("number of neighbors", nneigh, n);
-    print_all_neighbors(neighbors, nneigh, n, h_particles);
-
-    printf("dist2(p3,p4) = %f\n", distance2(h_particles[3].pos, h_particles[4].pos));
+    print_int_array("number of neighbors", h_nneigh, n);
+    print_all_neighbors(h_neighbors, h_nneigh, n, h_particles);
 
     if (args.check) {
 
