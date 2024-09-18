@@ -17,6 +17,13 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 include_directories(./)
 include_directories(./include)
 
+if(NOT CMAKE_CUDA_ARCHITECTURES)
+    set(CMAKE_CUDA_ARCHITECTURES native)
+    message(STATUS "Using default GPU Architecture (CMAKE_CUDA_ARCHITECTURES): ${CMAKE_CUDA_ARCHITECTURES}")
+else()
+    message(STATUS "GPU Architecture (CMAKE_CUDA_ARCHITECTURES): ${CMAKE_CUDA_ARCHITECTURES}")
+endif()
+
 # ==============================================================================
 # Utility function to get PTX compilation & copying working
 # ==============================================================================
@@ -44,6 +51,10 @@ find_package(Thrust REQUIRED)
 # Find CUB Library
 # ==============================================================================
 find_package(CUB REQUIRED)
+
+
+# include cmake modules
+include(${PROJECT_SOURCE_DIR}/CMake/FetchCXXOpts.cmake)
 
 # ==============================================================================
 # Main Executable
