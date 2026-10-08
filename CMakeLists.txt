@@ -17,6 +17,14 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 include_directories(./)
 include_directories(./include)
 
+
+if(NOT CMAKE_CUDA_ARCHITECTURES)
+    set(CMAKE_CUDA_ARCHITECTURES native)
+    message(STATUS "Using default GPU Architecture (CMAKE_CUDA_ARCHITECTURES): ${CMAKE_CUDA_ARCHITECTURES}")
+else()
+    message(STATUS "GPU Architecture (CMAKE_CUDA_ARCHITECTURES): ${CMAKE_CUDA_ARCHITECTURES}")
+endif()
+
 # ==============================================================================
 # Utility function to get PTX compilation & copying working
 # ==============================================================================
@@ -45,13 +53,22 @@ find_package(Thrust REQUIRED)
 # ==============================================================================
 find_package(CUB REQUIRED)
 
+
+include(${PROJECT_SOURCE_DIR}/CMake/FetchCXXOpts.cmake)
+
 # ==============================================================================
 # Main Executable
 # ==============================================================================
 thrust_create_target(Thrust)
 add_executable(rtxcuda src/main.cu src/cuda_kernel.cu common/common.cpp)
-target_link_libraries(rtxcuda PRIVATE CUDA::cudart OptiX7 Thrust)
-set_target_properties(rtxcuda PROPERTIES CUDA_ARCHITECTURES native)
+
+set_target_properties(rtxcuda PROPERTIES
+    CUDA_ARCHITECTURES ${CMAKE_CUDA_ARCHITECTURES}
+)
+target_include_directories(rtxcuda PRIVATE
+    ${CXXOPTS_SOURCE_DIR}/include
+)
+target_link_libraries(rtxcuda PRIVATE CUDA::cudart cxxopts OptiX7 Thrust)
 
 # ==============================================================================
 # Add any needed PTX compilations here

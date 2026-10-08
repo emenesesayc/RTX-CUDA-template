@@ -1,3 +1,5 @@
 build
 ptx
 rtxcuda
+externals/*
+*.swp

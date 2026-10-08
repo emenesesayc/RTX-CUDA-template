@@ -40,17 +40,13 @@ int main(int argc, char *argv[]) {
     printf("----------------------------------\n");
     printf("  RTX-CUDA Template by Temporal   \n");
     printf("----------------------------------\n");
-    if(!check_parameters(argc, argv)){
-        exit(EXIT_FAILURE);
-    }
 
     CmdArgs args = get_args(argc, argv);
     int dev = args.dev;
     int n = args.n;
-    //int k = atoi(argv[3]);
-    int steps = args.steps;
+    int steps = args.reps;
     int alg = args.alg;
-    int seed = 1123;
+    int seed = args.seed;
 
     cudaSetDevice(dev);
     print_gpu_specs(dev);

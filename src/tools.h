@@ -6,15 +6,8 @@
 #include <getopt.h>
 #include <iostream>
 #include <fstream>
+#include <cxxopts.hpp>
 
-#define ARG_NB 2
-#define ARG_REPS 3
-#define ARG_DEV 4
-#define ARG_NT 5
-#define ARG_SEED 6
-#define ARG_CHECK 7
-#define ARG_TIME 8
-#define ARG_POWER 9
 
 struct CmdArgs {
     int n, alg, steps, reps, dev, nt, seed, check, save_time, save_power;
@@ -28,97 +21,44 @@ struct Results {
     int power;
 };
 
-void print_help(){
-    fprintf(stderr, AC_BOLDGREEN "run as ./rtxcuda <n> <s> <alg>\n" AC_RESET
-                    "n   = problem size\n"
-                    "s   = number of simulation steps\n"
-                    "alg = algorithm\n"
-                    "   1 -> %s\n"
-                    "   2 -> %s\n"
-                    "   3 -> %s\n"
-                    "   4 -> %s\n"
-                    "   5 -> %s\n"
-                    "\n"
-                    "Options:\n"
-                    "   --reps <repetitions>      RMQ repeats for the avg time (default: 10)\n"
-                    "   --dev <device ID>         device ID (default: 0)\n"
-                    "   --nt  <thread num>        number of CPU threads\n"
-                    "   --seed <seed>             seed for PRNG\n"
-                    "   --check                   check correctness\n"
-                    "   --save-time=<file>        \n"
-                    "   --save-power=<file>       \n",
-                    algStr[1],
-                    algStr[2],
-                    algStr[3],
-                    algStr[4],
-                    algStr[5]);
-}
 
-#define NUM_REQUIRED_POS_ARGS 3
 CmdArgs get_args(int argc, char *argv[]) {
-    CmdArgs args;
-    args.n = atoi(argv[1]);
-    args.steps = atoi(argv[2]);
-    args.alg = atoi(argv[3]);
-    if (!args.n || !args.steps) {
-        print_help();
-        exit(EXIT_FAILURE);
+    cxxopts::Options options("rtxcuda", "Template for rtx-compute");
+    std::cout << "ASD" << std::endl;
+    options.add_options()
+        ("h,help", "Print help")
+	("n", "Problem size", cxxopts::value<int>())
+	("a,alg", "Algorithm: 1) cuda, 2) cub, 3) thrust, 4) rtx", cxxopts::value<int>())
+	("seed", "Seed for PRNG", cxxopts::value<int>())
+	("reps", "Number of repetitions for the avg time", cxxopts::value<int>()->default_value("1"))
+	("nt", "Number of CPU threads", cxxopts::value<int>()->default_value("1"))
+	("check", "Check correctness")
+	("save-time", "Save time measurements", cxxopts::value<std::string>()->default_value(""))
+	("save-power", "Save power measurements", cxxopts::value<std::string>()->default_value(""))
+	("dev", "GPU device id", cxxopts::value<int>()->default_value("0"));
+
+    std::cout << "befpre parsing" << std::endl;
+    auto result = options.parse(argc, argv);
+    std::cout << "arguments parsed" << std::endl;
+
+    if (result.count("help") || !result.count("n") || !result.count("alg")) {
+        std::cout << options.help({""}) << std::endl;
+	std::exit(0);
     }
 
-    args.reps = 10;
-    args.seed = time(0);
-    args.dev = 0;
-    args.check = 0;
-    args.save_time = 0;
-    args.save_power = 0;
-    args.nt = 1;
-    args.time_file = "";
-    args.power_file = "";
-    
-    static struct option long_option[] = {
-        // {name , has_arg, flag, val}
-        {"reps", required_argument, 0, ARG_REPS},
-        {"dev", required_argument, 0, ARG_DEV},
-        {"nt", required_argument, 0, ARG_NT},
-        {"seed", required_argument, 0, ARG_SEED},
-        {"check", no_argument, 0, ARG_CHECK},
-        {"save-time", optional_argument, 0, ARG_TIME},
-        {"save-power", optional_argument, 0, ARG_POWER},
-    };
-    int opt, opt_idx;
-    while ((opt = getopt_long(argc, argv, "12345", long_option, &opt_idx)) != -1) {
-        if (isdigit(opt))
-                continue;
-        switch (opt) {
-            case ARG_REPS:
-                args.reps = atoi(optarg);
-                break;
-            case ARG_DEV:
-                args.dev = atoi(optarg);
-                break;
-            case ARG_NT: 
-                args.nt = atoi(optarg);
-                break;
-            case ARG_SEED:
-                args.seed = atoi(optarg);
-                break;
-            case ARG_CHECK:
-                args.check = 1;
-                break;
-            case ARG_TIME:
-                args.save_time = 1;
-                if (optarg != NULL)
-                    args.time_file = optarg;
-                break;
-            case ARG_POWER:
-                args.save_power = 1;
-                if (optarg != NULL)
-                    args.power_file = optarg;
-                break;
-            default:
-                break;
-        }
-    }
+    CmdArgs args;
+    args.n = result["n"].as<int>();
+    args.alg = result["alg"].as<int>();
+    args.seed = result.count("seed") ? result["seed"].as<int>() : time(0);
+    args.reps = result["reps"].as<int>();
+    args.nt = result["nt"].as<int>();
+    args.dev = result["dev"].as<int>();
+    args.check = result.count("check");
+    args.save_time = result.count("save-time");
+    args.time_file = result["save-time"].as<std::string>();
+    args.save_power = result.count("save-power");
+    args.power_file = result["save-power"].as<std::string>();
+	
 
 
     printf( "Params:\n"
@@ -141,32 +81,6 @@ bool is_equal(float a, float b) {
     return abs(a - b) < epsilon;
 }
 
-bool check_parameters(int argc, char **argv){
-    int posargs = 0;
-
-    for (int i = 1; i < argc; i++) {
-
-        // If it begins with '-', it's an option, skip it
-        if (argv[i][0] == '-') {
-
-            // If the option expects a value (e.g. --opt VALUE)
-            if (i + 1 < argc && argv[i+1][0] != '-') {
-                i++; // skip the value
-            }
-
-            continue;
-        }
-
-        // Otherwise it's a positional argument
-        posargs++;
-    }
-    if(posargs != NUM_REQUIRED_POS_ARGS){
-        fprintf(stderr, AC_YELLOW "missing arguments (%i != %i)\n" AC_RESET, posargs, NUM_REQUIRED_POS_ARGS);
-        print_help();
-        return false;
-    }
-    return true;
-}
 
 void print_gpu_specs(int dev) {
     cudaDeviceProp prop;
