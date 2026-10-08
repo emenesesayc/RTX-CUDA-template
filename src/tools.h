@@ -24,7 +24,6 @@ struct Results {
 
 CmdArgs get_args(int argc, char *argv[]) {
     cxxopts::Options options("rtxcuda", "Template for rtx-compute");
-    std::cout << "ASD" << std::endl;
     options.add_options()
         ("h,help", "Print help")
 	("n", "Problem size", cxxopts::value<int>())
@@ -37,9 +36,7 @@ CmdArgs get_args(int argc, char *argv[]) {
 	("save-power", "Save power measurements", cxxopts::value<std::string>()->default_value(""))
 	("dev", "GPU device id", cxxopts::value<int>()->default_value("0"));
 
-    std::cout << "befpre parsing" << std::endl;
     auto result = options.parse(argc, argv);
-    std::cout << "arguments parsed" << std::endl;
 
     if (result.count("help") || !result.count("n") || !result.count("alg")) {
         std::cout << options.help({""}) << std::endl;

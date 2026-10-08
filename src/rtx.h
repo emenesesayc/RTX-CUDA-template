@@ -1,5 +1,5 @@
 #pragma once
-void rtx(int n, int k, int steps, int alg, float *darray, curandState *devStates) {
+void rtx(int n, int k, int steps, int alg, float *darray, curandState *devStates, CmdArgs args) {
     printf("--------------------- RTX OptiX Min %-15s ---------------------\n", algStr[alg]);
     Timer timer;
     float output, *d_output, cpuMin=-1.0f;
@@ -36,6 +36,7 @@ void rtx(int n, int k, int steps, int alg, float *darray, curandState *devStates
 
 
 
+    if (args.save_power) GPUPowerBegin("rtx");
     // 3) Build Acceleration Structure 
     printf("%sBuild AS on GPU......................", AC_MAGENTA); fflush(stdout);
     timer.restart();
@@ -75,6 +76,7 @@ void rtx(int n, int k, int steps, int alg, float *darray, curandState *devStates
             OPTIX_CHECK(optixLaunch(state.pipeline, 0, reinterpret_cast<CUdeviceptr>(device_params), sizeof(Params), &state.sbt, 1, 1, 1));
             CUDA_CHECK(cudaDeviceSynchronize());
             timer.stop();
+	    if (args.save_power) GPUPowerEnd();
             CUDA_CHECK( cudaMemcpy(&output, d_output, sizeof(float), cudaMemcpyDeviceToHost) );
             printf("done: %f ms (min %f, cpuMin %f)%s\n", timer.get_elapsed_ms(), output, cpuMin, AC_RESET);
         }
@@ -104,6 +106,7 @@ void rtx(int n, int k, int steps, int alg, float *darray, curandState *devStates
         //printf("Press enter...\n");
         //getchar();
     }
+
     printf("done\n");
     // 6) clean up
     printf("cleaning up RTX environment.........."); fflush(stdout);

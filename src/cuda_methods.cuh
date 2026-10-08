@@ -37,7 +37,7 @@ __global__ void min_kernel(int n, float *x, float *out) {
     }
 }
 
-void cudaWarpShuffle(int n, int steps, float *darray, curandState *devStates) {
+void cudaWarpShuffle(int n, int steps, float *darray, curandState *devStates, CmdArgs args) {
     printf("Simulating for %i steps\n", steps);
     float min, *dout, max=100000.0f;
     int grid = (n + BSIZE - 1) / BSIZE;
@@ -49,10 +49,13 @@ void cudaWarpShuffle(int n, int steps, float *darray, curandState *devStates) {
         //cpuprint_array(n, darray);
         cudaMemcpy(dout, &max, sizeof(float)*1, cudaMemcpyHostToDevice);
         printf(AC_BOLDCYAN "\tCUDA Warp Shuffle MIN................" AC_RESET);
+
+	GPUPowerBegin("cuda");
         Timer timer;
         min_kernel<<<grid, BSIZE>>>(n, darray, dout);
         CUDA_CHECK(cudaDeviceSynchronize());
         timer.stop();
+	double tot_energy = GPUPowerEnd();
         cudaMemcpy(&min, dout, sizeof(float), cudaMemcpyDeviceToHost);
         printf(AC_BOLDCYAN "done: %f ms (min %f, cpumin %f)\n" AC_RESET, timer.get_elapsed_ms(), min, cpumin_point(n, darray));
 
@@ -76,7 +79,7 @@ void cudaWarpShuffle(int n, int steps, float *darray, curandState *devStates) {
 
 
 // 2) CUB approach
-void cudaCUB(int n, int steps, float *darray, curandState *devStates){
+void cudaCUB(int n, int steps, float *darray, curandState *devStates, CmdArgs args) {
     float *d_out, h_out;
     cub::CachingDeviceAllocator  g_allocator(true);
     CubDebugExit(g_allocator.DeviceAllocate((void**)&d_out, sizeof(float) * 1));
@@ -90,10 +93,12 @@ void cudaCUB(int n, int steps, float *darray, curandState *devStates){
     for(int ki = 0; ki<steps; ++ki){
         // Run parallel MIN
         printf(AC_BOLDCYAN "\tCUB DeviceReduce::Min................" AC_RESET);
+	GPUPowerBegin("cub");
         Timer timer;
         CubDebugExit(cub::DeviceReduce::Min(d_temp_storage, temp_storage_bytes, darray, d_out, n));
         cudaDeviceSynchronize();
         timer.stop();
+	double tot_energy = GPUPowerEnd();
         CubDebugExit(cudaMemcpy(&h_out, d_out, sizeof(float) * 1, cudaMemcpyDeviceToHost));
         printf(AC_BOLDCYAN "done: %f ms (min %f, cpumin %f)\n" AC_RESET, timer.get_elapsed_ms(), h_out, cpumin_point(n, darray));
 
@@ -113,16 +118,18 @@ void cudaCUB(int n, int steps, float *darray, curandState *devStates){
 
 
 // 3) Thrust approach
-void cudaThrust(int n, int steps, float *darray, curandState *devStates) {
+void cudaThrust(int n, int steps, float *darray, curandState *devStates, CmdArgs args) {
     thrust::device_ptr<float> D(darray);
     printf("Simulating for %i steps\n", steps);
     for(int ki = 0; ki<steps; ++ki){
         // Thrust Min
         printf(AC_BOLDCYAN "\tThrust Min..........................." AC_RESET);
+	GPUPowerBegin("thrust");
         Timer timer;
         float min = thrust::reduce(D, D+n, 10000.0, thrust::minimum<float>());
         cudaDeviceSynchronize();
         timer.stop();
+	GPUPowerEnd();
         printf(AC_BOLDCYAN "done: %f ms (min %f, cpumin %f)\n" AC_RESET, timer.get_elapsed_ms(), min, cpumin_point(n, darray));
 
         // Simulation --> update points with CUDA kernel 

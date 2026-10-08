@@ -26,6 +26,7 @@ const char *algStr[6] = {"", "WARP_SHUFFLE", "CUB", "THRUST", "RTX_CLOSEST_HIT"}
 
 #include "common/common.h"
 #include "common/Timer.h"
+#include "common/nvml_power_monitor.hpp"
 #include "src/rand.cuh"
 #include "src/tools.h"
 #include "src/device_tools.cuh"
@@ -58,16 +59,16 @@ int main(int argc, char *argv[]) {
     // 2) computation
     switch(alg){
         case ALG_WARP_SHUFFLE:
-            cudaWarpShuffle(n, steps, d_array, devStates);
+            cudaWarpShuffle(n, steps, d_array, devStates, args);
             break;
         case ALG_CUB:
-            cudaCUB(n, steps, d_array, devStates);
+            cudaCUB(n, steps, d_array, devStates, args);
             break;
         case ALG_THRUST:
-            cudaThrust(n, steps, d_array, devStates);
+            cudaThrust(n, steps, d_array, devStates, args);
             break;
         case ALG_RTX_CLOSEST_HIT:
-            rtx(n, 1, steps, alg, d_array, devStates);
+            rtx(n, 1, steps, alg, d_array, devStates, args);
             break;
     }
     printf("Benchmark Finished\n");

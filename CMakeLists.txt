@@ -68,7 +68,7 @@ set_target_properties(rtxcuda PROPERTIES
 target_include_directories(rtxcuda PRIVATE
     ${CXXOPTS_SOURCE_DIR}/include
 )
-target_link_libraries(rtxcuda PRIVATE CUDA::cudart cxxopts OptiX7 Thrust)
+target_link_libraries(rtxcuda PRIVATE CUDA::cudart CUDA::nvml cxxopts OptiX7 Thrust)
 
 # ==============================================================================
 # Add any needed PTX compilations here
